@@ -83,15 +83,63 @@ export default function ProfileScreen() {
   };
 
   const toggleHealthKit = async (enabled: boolean) => {
-    setHealthKitEnabled(enabled);
-    await saveSettings('healthKitEnabled', enabled);
-    
     if (enabled) {
-      Alert.alert(
-        'Apple Health',
-        'Health-Integration aktiviert. Diese Funktion wird in einer zukünftigen Version verfügbar sein.',
-        [{ text: 'OK' }]
-      );
+      // Check if Apple Health is available first
+      const isAvailable = await appleHealthService.isHealthDataAvailable();
+      if (!isAvailable) {
+        Alert.alert(
+          'Apple Health nicht verfügbar',
+          'Apple Health ist auf diesem Gerät nicht verfügbar oder wird nicht unterstützt.',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
+      // Request permissions and initialize Apple Health
+      setIsLoadingHealthData(true);
+      try {
+        const success = await appleHealthService.requestPermissions();
+        if (success) {
+          setHealthKitEnabled(true);
+          await saveSettings('healthKitEnabled', true);
+          
+          // Try to load health data
+          const data = await appleHealthService.getHealthData();
+          if (data) {
+            setHealthData(data);
+            Alert.alert(
+              'Apple Health verbunden',
+              'Gesundheitsdaten wurden erfolgreich synchronisiert!',
+              [{ text: 'OK' }]
+            );
+          } else {
+            Alert.alert(
+              'Apple Health verbunden',
+              'Verbindung erfolgreich, aber keine Daten verfügbar. Stelle sicher, dass du Daten in der Health App eingetragen hast.',
+              [{ text: 'OK' }]
+            );
+          }
+        } else {
+          Alert.alert(
+            'Verbindung fehlgeschlagen',
+            'Die Verbindung zu Apple Health konnte nicht hergestellt werden. Bitte erlaube den Zugriff in den Einstellungen.',
+            [{ text: 'OK' }]
+          );
+        }
+      } catch (error) {
+        console.error('Fehler bei Apple Health Integration:', error);
+        Alert.alert(
+          'Fehler',
+          'Ein Fehler ist bei der Verbindung zu Apple Health aufgetreten.',
+          [{ text: 'OK' }]
+        );
+      } finally {
+        setIsLoadingHealthData(false);
+      }
+    } else {
+      setHealthKitEnabled(false);
+      await saveSettings('healthKitEnabled', false);
+      setHealthData(null);
     }
   };
 

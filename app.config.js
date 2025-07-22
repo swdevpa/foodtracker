@@ -27,8 +27,7 @@ export default {
         ITSAppUsesNonExemptEncryption: false
       },
       entitlements: {
-        "com.apple.developer.healthkit": true,
-        "com.apple.developer.healthkit.access": []
+        "com.apple.developer.healthkit": true
       }
     },
     android: {
@@ -43,7 +42,14 @@ export default {
       bundler: "metro"
     },
     plugins: [
-      "./plugins/react-native-health-plugin.js"
+      [
+        "react-native-health",
+        {
+          isClinicalDataEnabled: false,
+          healthSharePermission: "This app uses HealthKit to import your health data like weight, height, and activity to provide personalized meal recommendations.",
+          healthUpdatePermission: "This app uses HealthKit to save nutritional information from your meals to your Health app."
+        }
+      ]
     ],
     extra: {
       eas: {

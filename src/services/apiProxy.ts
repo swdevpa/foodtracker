@@ -1,13 +1,15 @@
 /**
- * API Proxy Service - For Production Use
+ * API Proxy Service - Enterprise Security with RSA Authentication
  * 
- * This service should be used in production to proxy API calls through your backend.
- * Never expose API keys directly in React Native apps!
+ * This service uses asymmetric cryptography for maximum security.
+ * Best Practice: Zero secrets in app code, RSA signature-based authentication!
  */
+
+import { secureAuth } from '../utils/secureAuth';
 
 interface BackendConfig {
   baseUrl: string;
-  apiKey?: string; // Your app's API key for your backend
+  useSecureAuth: boolean;
 }
 
 class ApiProxyService {
@@ -20,9 +22,21 @@ class ApiProxyService {
   private async makeRequest(endpoint: string, options: RequestInit = {}) {
     const url = `${this.config.baseUrl}${endpoint}`;
     
+    // Get RSA-signed token for authentication (enterprise security)
+    let authHeader = {};
+    if (this.config.useSecureAuth) {
+      try {
+        const token = await secureAuth.generateSecureToken();
+        authHeader = { 'Authorization': `Bearer ${token}` };
+      } catch (error) {
+        console.error('Secure token generation failed:', error);
+        throw new Error('Authentication failed');
+      }
+    }
+    
     const headers = {
       'Content-Type': 'application/json',
-      ...(this.config.apiKey && { 'Authorization': `Bearer ${this.config.apiKey}` }),
+      ...authHeader,
       ...options.headers,
     };
 
@@ -32,6 +46,27 @@ class ApiProxyService {
     });
 
     if (!response.ok) {
+      if (response.status === 401) {
+        // Token validation failed, regenerate and retry once
+        if (this.config.useSecureAuth) {
+          console.log('Authentication failed, regenerating token...');
+          const newToken = await secureAuth.generateSecureToken();
+          
+          const retryResponse = await fetch(url, {
+            ...options,
+            headers: {
+              ...headers,
+              'Authorization': `Bearer ${newToken}`
+            }
+          });
+          
+          if (!retryResponse.ok) {
+            throw new Error(`API Error: ${retryResponse.status} ${retryResponse.statusText}`);
+          }
+          
+          return retryResponse.json();
+        }
+      }
       throw new Error(`API Error: ${response.status} ${response.statusText}`);
     }
 
@@ -39,23 +74,25 @@ class ApiProxyService {
   }
 
   // Proxy for Gemini API calls
-  async generateRecipes(userProfile: any, inventory: any, mealTypes: any, servings: number) {
-    return this.makeRequest('/api/recipes/generate', {
+  async generateWithGemini(contents: any, generationConfig?: any) {
+    return this.makeRequest('/gemini/generate', {
       method: 'POST',
       body: JSON.stringify({
-        userProfile,
-        inventory,
-        mealTypes,
-        servings
+        contents,
+        generationConfig
       })
     });
   }
 
   // Proxy for USDA API calls  
-  async searchFoods(query: string, limit: number = 25) {
-    return this.makeRequest('/api/nutrition/search', {
+  async searchFoods(query: string, pageSize: number = 25, dataType?: string[]) {
+    return this.makeRequest('/usda/search', {
       method: 'POST',
-      body: JSON.stringify({ query, limit })
+      body: JSON.stringify({ 
+        query, 
+        pageSize,
+        dataType
+      })
     });
   }
 
@@ -80,15 +117,16 @@ class ApiProxyService {
 // For development only - use direct API calls
 const isDevelopment = __DEV__;
 
-// Production configuration - replace with your backend URL
+// Production configuration - RSA authenticated Cloudflare Worker (Enterprise Security)
 const PRODUCTION_CONFIG: BackendConfig = {
-  baseUrl: 'https://your-backend-api.com',
-  apiKey: 'your-app-api-key', // Different from Gemini/USDA keys!
+  baseUrl: 'https://foodtracker-api-proxy.swdev-pa.workers.dev',
+  useSecureAuth: true, // Enterprise RSA signature-based authentication
 };
 
-// Development configuration - uses direct API calls
+// Development configuration - direct API calls (development only)
 const DEVELOPMENT_CONFIG: BackendConfig = {
   baseUrl: 'http://localhost:3000', // Your local development server
+  useSecureAuth: false, // Skip secure auth for local development
 };
 
 export const apiProxy = new ApiProxyService(
