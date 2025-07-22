@@ -2,9 +2,6 @@ export interface Env {
   GEMINI_API_KEY: string;
   USDA_API_KEY: string;
   CORS_ORIGIN: string;
-  JWT_SECRET: string;
-  // Durable Object for storing registered app public keys
-  APP_REGISTRY: DurableObjectNamespace;
 }
 
 interface GeminiRequest {

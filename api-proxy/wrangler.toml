@@ -8,5 +8,4 @@ CORS_ORIGIN = "expo://localhost"
 
 # Secrets (set via wrangler secret put)
 # GEMINI_API_KEY
-# USDA_API_KEY  
-# JWT_SECRET
+# USDA_API_KEY
