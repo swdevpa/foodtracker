@@ -41,10 +41,10 @@ class AppleHealthService {
         AppleHealthKit.Constants.Permissions.BasalEnergyBurned,
       ],
       write: [
-        AppleHealthKit.Constants.Permissions.DietaryEnergyConsumed,
-        AppleHealthKit.Constants.Permissions.DietaryProtein,
-        AppleHealthKit.Constants.Permissions.DietaryFatTotal,
-        AppleHealthKit.Constants.Permissions.DietaryCarbohydrates,
+        AppleHealthKit.Constants.Permissions.EnergyConsumed,
+        AppleHealthKit.Constants.Permissions.Protein,
+        AppleHealthKit.Constants.Permissions.FatTotal,
+        AppleHealthKit.Constants.Permissions.Carbohydrates,
       ],
     },
   };
@@ -56,13 +56,13 @@ class AppleHealthService {
     }
 
     return new Promise((resolve) => {
-      AppleHealthKit.isAvailable((error: string, available: boolean) => {
+      AppleHealthKit.isAvailable((error: Object, results: boolean) => {
         if (error) {
           console.error('Fehler beim Prüfen der HealthKit Verfügbarkeit:', error);
           resolve(false);
         } else {
-          console.log('HealthKit verfügbar:', available);
-          resolve(available);
+          console.log('HealthKit verfügbar:', results);
+          resolve(results);
         }
       });
     });
@@ -188,7 +188,7 @@ class AppleHealthService {
         await new Promise<void>((resolve, reject) => {
           const options = {
             value: nutritionEntry.calories,
-            unit: 'kcal',
+            unit: AppleHealthKit.Constants.Units.kilocalorie,
             startDate: nutritionEntry.date.toISOString(),
             endDate: nutritionEntry.date.toISOString(),
           };
