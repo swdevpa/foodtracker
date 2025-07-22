@@ -28,9 +28,8 @@ export interface NutritionEntry {
 
 class AppleHealthService {
   private isInitialized: boolean = false;
-  private hasPermissions: boolean = false;
 
-  // Apple Health Permissions
+  // Simplified permissions based on NotJust.dev guide
   private permissions: HealthKitPermissions = {
     permissions: {
       read: [
@@ -40,26 +39,45 @@ class AppleHealthService {
         AppleHealthKit.Constants.Permissions.Steps,
         AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
         AppleHealthKit.Constants.Permissions.BasalEnergyBurned,
-        AppleHealthKit.Constants.Permissions.DietaryEnergyConsumed,
       ],
       write: [
         AppleHealthKit.Constants.Permissions.DietaryEnergyConsumed,
         AppleHealthKit.Constants.Permissions.DietaryProtein,
         AppleHealthKit.Constants.Permissions.DietaryFatTotal,
         AppleHealthKit.Constants.Permissions.DietaryCarbohydrates,
-        AppleHealthKit.Constants.Permissions.DietaryFiber,
-        AppleHealthKit.Constants.Permissions.DietarySugar,
-        AppleHealthKit.Constants.Permissions.DietarySodium,
-        AppleHealthKit.Constants.Permissions.DietaryCalcium,
-        AppleHealthKit.Constants.Permissions.DietaryIron,
-        AppleHealthKit.Constants.Permissions.DietaryVitaminC,
       ],
     },
   };
 
+  async isHealthDataAvailable(): Promise<boolean> {
+    if (Platform.OS !== 'ios') {
+      console.log('Apple Health ist nur auf iOS verfügbar');
+      return false;
+    }
+
+    return new Promise((resolve) => {
+      AppleHealthKit.isAvailable((error: string, available: boolean) => {
+        if (error) {
+          console.error('Fehler beim Prüfen der HealthKit Verfügbarkeit:', error);
+          resolve(false);
+        } else {
+          console.log('HealthKit verfügbar:', available);
+          resolve(available);
+        }
+      });
+    });
+  }
+
   async initialize(): Promise<boolean> {
     if (Platform.OS !== 'ios') {
       console.log('Apple Health ist nur auf iOS verfügbar');
+      return false;
+    }
+
+    // First check if HealthKit is available
+    const available = await this.isHealthDataAvailable();
+    if (!available) {
+      console.log('HealthKit ist auf diesem Gerät nicht verfügbar');
       return false;
     }
 
@@ -68,12 +86,10 @@ class AppleHealthService {
         if (error) {
           console.error('Apple Health Initialisierung fehlgeschlagen:', error);
           this.isInitialized = false;
-          this.hasPermissions = false;
           resolve(false);
         } else {
           console.log('Apple Health erfolgreich initialisiert');
           this.isInitialized = true;
-          this.hasPermissions = true;
           resolve(true);
         }
       });
@@ -81,7 +97,7 @@ class AppleHealthService {
   }
 
   async getHealthData(): Promise<HealthData | null> {
-    if (!this.isInitialized || !this.hasPermissions) {
+    if (!this.isInitialized) {
       const initialized = await this.initialize();
       if (!initialized) return null;
     }
@@ -94,6 +110,9 @@ class AppleHealthService {
         AppleHealthKit.getLatestWeight({}, (error: string, results: HealthValue) => {
           if (!error && results) {
             healthData.weight = results.value;
+            console.log('Gewicht abgerufen:', results.value);
+          } else if (error) {
+            console.log('Gewicht konnte nicht abgerufen werden:', error);
           }
           resolve();
         });
@@ -103,7 +122,10 @@ class AppleHealthService {
       await new Promise<void>((resolve) => {
         AppleHealthKit.getLatestHeight({}, (error: string, results: HealthValue) => {
           if (!error && results) {
-            healthData.height = results.value;
+            healthData.height = results.value * 100; // Convert m to cm
+            console.log('Größe abgerufen:', results.value * 100, 'cm');
+          } else if (error) {
+            console.log('Größe konnte nicht abgerufen werden:', error);
           }
           resolve();
         });
@@ -115,64 +137,38 @@ class AppleHealthService {
           if (!error && results) {
             const birthDate = new Date(results.value);
             const today = new Date();
-            healthData.age = today.getFullYear() - birthDate.getFullYear();
+            const age = today.getFullYear() - birthDate.getFullYear();
+            healthData.age = age;
+            console.log('Alter berechnet:', age);
+          } else if (error) {
+            console.log('Geburtsdatum konnte nicht abgerufen werden:', error);
           }
           resolve();
         });
       });
 
-      // Schritte heute
+      // Schritte heute - simplified approach
       const today = new Date();
-      const startOfDay = new Date(today.setHours(0, 0, 0, 0));
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      
       await new Promise<void>((resolve) => {
-        AppleHealthKit.getStepCount(
-          {
-            startDate: startOfDay.toISOString(),
-            endDate: new Date().toISOString(),
-          },
-          (error: string, results: HealthValue) => {
-            if (!error && results) {
-              healthData.steps = results.value;
-            }
-            resolve();
+        const options = {
+          startDate: startOfDay.toISOString(),
+          endDate: new Date().toISOString(),
+        };
+
+        AppleHealthKit.getStepCount(options, (error: string, results: HealthValue) => {
+          if (!error && results) {
+            healthData.steps = results.value;
+            console.log('Schritte abgerufen:', results.value);
+          } else if (error) {
+            console.log('Schritte konnten nicht abgerufen werden:', error);
           }
-        );
+          resolve();
+        });
       });
 
-      // Aktive Kalorien heute
-      await new Promise<void>((resolve) => {
-        AppleHealthKit.getActiveEnergyBurned(
-          {
-            startDate: startOfDay.toISOString(),
-            endDate: new Date().toISOString(),
-          },
-          (error: string, results: HealthValue[]) => {
-            if (!error && results) {
-              const totalActive = results.reduce((sum, item) => sum + item.value, 0);
-              healthData.activeEnergyBurned = totalActive;
-            }
-            resolve();
-          }
-        );
-      });
-
-      // Ruheumsatz
-      await new Promise<void>((resolve) => {
-        AppleHealthKit.getBasalEnergyBurned(
-          {
-            startDate: startOfDay.toISOString(),
-            endDate: new Date().toISOString(),
-          },
-          (error: string, results: HealthValue[]) => {
-            if (!error && results) {
-              const totalResting = results.reduce((sum, item) => sum + item.value, 0);
-              healthData.restingEnergyBurned = totalResting;
-            }
-            resolve();
-          }
-        );
-      });
-
+      console.log('Finale Gesundheitsdaten:', healthData);
       return healthData;
     } catch (error) {
       console.error('Fehler beim Abrufen der Health-Daten:', error);
@@ -181,167 +177,39 @@ class AppleHealthService {
   }
 
   async saveMealToHealth(nutritionEntry: NutritionEntry): Promise<boolean> {
-    if (!this.isInitialized || !this.hasPermissions) {
+    if (!this.isInitialized) {
       const initialized = await this.initialize();
       if (!initialized) return false;
     }
 
     try {
-      const promises: Promise<boolean>[] = [];
-
-      // Kalorien speichern
+      // Simplified: Only save calories for now
       if (nutritionEntry.calories) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryEnergyConsumed,
-          nutritionEntry.calories,
-          'kcal',
-          nutritionEntry.date
-        ));
+        await new Promise<void>((resolve, reject) => {
+          const options = {
+            value: nutritionEntry.calories,
+            unit: 'kcal',
+            startDate: nutritionEntry.date.toISOString(),
+            endDate: nutritionEntry.date.toISOString(),
+          };
+
+          AppleHealthKit.saveFood(options, (error: string) => {
+            if (error) {
+              console.error('Fehler beim Speichern der Kalorien:', error);
+              reject(error);
+            } else {
+              console.log('Kalorien erfolgreich gespeichert:', nutritionEntry.calories);
+              resolve();
+            }
+          });
+        });
       }
 
-      // Protein speichern
-      if (nutritionEntry.protein) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryProtein,
-          nutritionEntry.protein,
-          'g',
-          nutritionEntry.date
-        ));
-      }
-
-      // Fett speichern
-      if (nutritionEntry.fat) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryFatTotal,
-          nutritionEntry.fat,
-          'g',
-          nutritionEntry.date
-        ));
-      }
-
-      // Kohlenhydrate speichern
-      if (nutritionEntry.carbohydrates) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryCarbohydrates,
-          nutritionEntry.carbohydrates,
-          'g',
-          nutritionEntry.date
-        ));
-      }
-
-      // Ballaststoffe speichern
-      if (nutritionEntry.fiber) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryFiber,
-          nutritionEntry.fiber,
-          'g',
-          nutritionEntry.date
-        ));
-      }
-
-      // Zucker speichern
-      if (nutritionEntry.sugar) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietarySugar,
-          nutritionEntry.sugar,
-          'g',
-          nutritionEntry.date
-        ));
-      }
-
-      // Natrium speichern
-      if (nutritionEntry.sodium) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietarySodium,
-          nutritionEntry.sodium,
-          'mg',
-          nutritionEntry.date
-        ));
-      }
-
-      // Calcium speichern
-      if (nutritionEntry.calcium) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryCalcium,
-          nutritionEntry.calcium,
-          'mg',
-          nutritionEntry.date
-        ));
-      }
-
-      // Eisen speichern
-      if (nutritionEntry.iron) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryIron,
-          nutritionEntry.iron,
-          'mg',
-          nutritionEntry.date
-        ));
-      }
-
-      // Vitamin C speichern
-      if (nutritionEntry.vitaminC) {
-        promises.push(this.saveSingleNutrient(
-          AppleHealthKit.Constants.Permissions.DietaryVitaminC,
-          nutritionEntry.vitaminC,
-          'mg',
-          nutritionEntry.date
-        ));
-      }
-
-      const results = await Promise.all(promises);
-      const allSuccessful = results.every(result => result === true);
-
-      if (allSuccessful) {
-        console.log('Nährwerte erfolgreich in Apple Health gespeichert');
-      } else {
-        console.warn('Einige Nährwerte konnten nicht in Apple Health gespeichert werden');
-      }
-
-      return allSuccessful;
+      return true;
     } catch (error) {
       console.error('Fehler beim Speichern in Apple Health:', error);
       return false;
     }
-  }
-
-  private saveSingleNutrient(
-    type: string,
-    value: number,
-    unit: string,
-    date: Date
-  ): Promise<boolean> {
-    return new Promise((resolve) => {
-      const options = {
-        value,
-        unit,
-        startDate: date.toISOString(),
-        endDate: date.toISOString(),
-      };
-
-      AppleHealthKit.saveFood(options, (error: string) => {
-        if (error) {
-          console.error(`Fehler beim Speichern von ${type}:`, error);
-          resolve(false);
-        } else {
-          resolve(true);
-        }
-      });
-    });
-  }
-
-  async isHealthDataAvailable(): Promise<boolean> {
-    if (Platform.OS !== 'ios') return false;
-    
-    return new Promise((resolve) => {
-      AppleHealthKit.isAvailable((error: string, available: boolean) => {
-        if (error) {
-          resolve(false);
-        } else {
-          resolve(available);
-        }
-      });
-    });
   }
 
   async requestPermissions(): Promise<boolean> {

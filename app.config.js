@@ -27,6 +27,8 @@ export default {
         ITSAppUsesNonExemptEncryption: false
       },
       entitlements: {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.access": []
       }
     },
     android: {
@@ -41,6 +43,7 @@ export default {
       bundler: "metro"
     },
     plugins: [
+      "./plugins/react-native-health-plugin.js"
     ],
     extra: {
       eas: {
