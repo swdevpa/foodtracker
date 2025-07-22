@@ -55,9 +55,7 @@ export default {
       eas: {
         projectId: "ef6ff013-e0f1-43ea-9045-3fbcf717224f"
       },
-      GEMINI_API_KEY: process.env.GEMINI_API_KEY,
-      USDA_API_KEY: process.env.USDA_API_KEY || process.env.NUTRITION_API_KEY,
-      USDA_API_BASE_URL: process.env.USDA_API_BASE_URL || "https://api.nal.usda.gov/fdc/v1"
+      API_PROXY_URL: process.env.API_PROXY_URL
     }
   }
 };
