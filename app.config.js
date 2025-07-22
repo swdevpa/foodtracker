@@ -27,7 +27,6 @@ export default {
         ITSAppUsesNonExemptEncryption: false
       },
       entitlements: {
-        "com.apple.developer.sign-in-with-apple": true
       }
     },
     android: {
@@ -42,7 +41,6 @@ export default {
       bundler: "metro"
     },
     plugins: [
-      "expo-apple-authentication"
     ],
     extra: {
       eas: {
