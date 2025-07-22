@@ -28,6 +28,13 @@ interface USDARequest {
   sortOrder?: string;
 }
 
+interface RegistrationData {
+  bundleId: string;
+  publicKey: JsonWebKey;
+  fingerprint: string;
+  installationId?: string;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -71,7 +78,6 @@ export default {
     }
 
     // Basic rate limiting (could be enhanced with Durable Objects)
-    const clientIP = request.headers.get('CF-Connecting-IP') || 'unknown';
     
     try {
       if (path === '/api/gemini/generate') {
@@ -190,108 +196,6 @@ async function handleUSDARequest(request: Request, env: Env, corsHeaders: Record
   });
 }
 
-// JWT Token validation function (Best Practice)
-async function validateToken(token: string, env: Env): Promise<boolean> {
-  try {
-    const payload = await verifyJWT(token, env.JWT_SECRET);
-    
-    // Validate payload structure and claims
-    if (!payload.app || !payload.bundleId || !payload.exp || !payload.iat) {
-      console.log('JWT: Invalid payload structure');
-      return false;
-    }
-
-    // Validate app-specific claims
-    if (payload.app !== 'foodtracker') {
-      console.log('JWT: Invalid app claim');
-      return false;
-    }
-
-    if (payload.bundleId !== 'com.swdevpa.foodtracker') {
-      console.log('JWT: Invalid bundle ID');
-      return false;
-    }
-
-    // Check if token is expired
-    const now = Math.floor(Date.now() / 1000);
-    if (payload.exp < now) {
-      console.log('JWT: Token expired');
-      return false;
-    }
-
-    // Check if token is not used before its time (iat = issued at)
-    if (payload.iat > now + 60) { // Allow 60 seconds clock skew
-      console.log('JWT: Token used before issue time');
-      return false;
-    }
-
-    console.log('JWT: Token valid for app:', payload.app, 'bundleId:', payload.bundleId);
-    return true;
-  } catch (error) {
-    console.log('JWT: Validation error:', error);
-    return false;
-  }
-}
-
-// JWT verification implementation
-async function verifyJWT(token: string, secret: string): Promise<any> {
-  const parts = token.split('.');
-  if (parts.length !== 3) {
-    throw new Error('Invalid JWT format');
-  }
-
-  const [headerB64, payloadB64, signatureB64] = parts;
-  
-  // Decode header and payload
-  const header = JSON.parse(base64UrlDecode(headerB64));
-  const payload = JSON.parse(base64UrlDecode(payloadB64));
-
-  // Verify algorithm
-  if (header.alg !== 'HS256') {
-    throw new Error('Unsupported algorithm');
-  }
-
-  // Create expected signature
-  const data = `${headerB64}.${payloadB64}`;
-  const expectedSignature = await createHMACSignature(data, secret);
-
-  // Compare signatures (constant-time comparison for security)
-  const providedSignature = base64UrlDecode(signatureB64);
-  if (!constantTimeEquals(expectedSignature, providedSignature)) {
-    throw new Error('Invalid signature');
-  }
-
-  return payload;
-}
-
-// HMAC-SHA256 signature creation
-async function createHMACSignature(data: string, secret: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const keyData = encoder.encode(secret);
-  const dataToSign = encoder.encode(data);
-
-  const cryptoKey = await crypto.subtle.importKey(
-    'raw',
-    keyData,
-    { name: 'HMAC', hash: 'SHA-256' },
-    false,
-    ['sign']
-  );
-
-  const signature = await crypto.subtle.sign('HMAC', cryptoKey, dataToSign);
-  return String.fromCharCode(...new Uint8Array(signature));
-}
-
-// Constant-time string comparison (prevents timing attacks)
-function constantTimeEquals(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  
-  let result = 0;
-  for (let i = 0; i < a.length; i++) {
-    result |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  }
-  return result === 0;
-}
 
 // Base64 URL decode
 function base64UrlDecode(str: string): string {
@@ -389,7 +293,7 @@ async function handleAppRegistration(request: Request, env: Env, corsHeaders: Re
   }
 
   try {
-    const registrationData = await request.json();
+    const registrationData: RegistrationData = await request.json();
     
     // Validate registration data
     if (!registrationData.bundleId || !registrationData.publicKey || !registrationData.fingerprint) {
@@ -426,13 +330,13 @@ async function handleAppRegistration(request: Request, env: Env, corsHeaders: Re
 // Simplified storage (in production, use Durable Objects)
 const appRegistry = new Map<string, JsonWebKey>();
 
-async function storeAppPublicKey(installationId: string, keyId: string, publicKey: JsonWebKey, env: Env): Promise<void> {
+async function storeAppPublicKey(installationId: string, keyId: string, publicKey: JsonWebKey, _env: Env): Promise<void> {
   const key = `${installationId}:${keyId}`;
   appRegistry.set(key, publicKey);
   console.log('Stored public key for:', key);
 }
 
-async function getAppPublicKey(installationId: string, keyId: string, env: Env): Promise<JsonWebKey | null> {
+async function getAppPublicKey(installationId: string, keyId: string, _env: Env): Promise<JsonWebKey | null> {
   const key = `${installationId}:${keyId}`;
   const publicKey = appRegistry.get(key);
   console.log('Retrieved public key for:', key, publicKey ? 'found' : 'not found');
