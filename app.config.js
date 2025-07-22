@@ -23,7 +23,8 @@ export default {
       infoPlist: {
         NSHealthShareUsageDescription: "This app uses HealthKit to import your health data like weight, height, and activity to provide personalized meal recommendations.",
         NSHealthUpdateUsageDescription: "This app uses HealthKit to save nutritional information from your meals to your Health app.",
-        NSHealthClinicalHealthRecordsShareUsageDescription: "This app does not access clinical health records."
+        NSHealthClinicalHealthRecordsShareUsageDescription: "This app does not access clinical health records.",
+        ITSAppUsesNonExemptEncryption: false
       },
       entitlements: {
         "com.apple.developer.sign-in-with-apple": true
@@ -45,12 +46,11 @@ export default {
     ],
     extra: {
       eas: {
-        projectId: "your-eas-project-id"
+        projectId: "ef6ff013-e0f1-43ea-9045-3fbcf717224f"
       },
       GEMINI_API_KEY: process.env.GEMINI_API_KEY,
       USDA_API_KEY: process.env.USDA_API_KEY || process.env.NUTRITION_API_KEY,
       USDA_API_BASE_URL: process.env.USDA_API_BASE_URL || "https://api.nal.usda.gov/fdc/v1"
-    },
-    owner: "your-expo-username"
+    }
   }
 };

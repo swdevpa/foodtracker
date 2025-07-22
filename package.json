@@ -17,6 +17,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo/config-plugins": "~10.1.1",
     "@expo/vector-icons": "^14.0.2",
     "@google/generative-ai": "^0.21.0",
     "@react-native-async-storage/async-storage": "2.1.2",
@@ -35,16 +36,17 @@
     "react-hook-form": "^7.53.1",
     "react-native": "0.79.5",
     "react-native-elements": "^3.4.3",
+    "react-native-health": "^1.19.0",
     "react-native-paper": "^5.12.5",
     "react-native-safe-area-context": "5.4.0",
     "react-native-screens": "~4.11.1",
     "react-native-vector-icons": "^10.2.0",
-    "zustand": "^5.0.1"
+    "zustand": "^5.0.1",
+    "expo-dev-client": "~5.2.4"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
     "@types/react": "~19.0.10",
-    "@types/react-native": "~0.73.0",
     "@typescript-eslint/eslint-plugin": "^7.7.0",
     "@typescript-eslint/parser": "^7.7.0",
     "eslint": "^8.57.0",
@@ -61,5 +63,20 @@
   ],
   "author": "Your Name",
   "license": "MIT",
-  "private": true
+  "private": true,
+  "overrides": {
+    "@expo/config-plugins": "~10.1.1"
+  },
+  "expo": {
+    "doctor": {
+      "reactNativeDirectoryCheck": {
+        "exclude": [
+          "dotenv",
+          "react-native-elements",
+          "react-native-vector-icons",
+          "react-native-health"
+        ]
+      }
+    }
+  }
 }

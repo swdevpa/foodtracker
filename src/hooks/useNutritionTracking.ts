@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Recipe, NutritionInfo, MealPlan } from '../types/Food';
 import { UserProfile } from '../types/User';
 import { NutritionCalculator } from '../utils/nutritionCalculator';
+import appleHealthService, { NutritionEntry } from '../services/appleHealthService';
 
 export interface DailyNutrition {
   date: string;
@@ -152,6 +153,49 @@ export const useNutritionTracking = (userProfile: UserProfile | null) => {
     }
   };
 
+  // Check if Health sync is enabled
+  const isHealthSyncEnabled = async (): Promise<boolean> => {
+    try {
+      const settings = await AsyncStorage.getItem('healthSettings');
+      if (settings) {
+        const { enabled } = JSON.parse(settings);
+        return enabled === true;
+      }
+      return false;
+    } catch (error) {
+      return false;
+    }
+  };
+
+  // Sync nutrition to Apple Health
+  const syncNutritionToHealth = async (recipe: Recipe) => {
+    const healthSyncEnabled = await isHealthSyncEnabled();
+    if (!healthSyncEnabled) return;
+
+    try {
+      const nutritionEntry: NutritionEntry = {
+        date: new Date(),
+        calories: recipe.nutrition?.calories || 0,
+        protein: recipe.nutrition?.protein || undefined,
+        fat: recipe.nutrition?.fat || undefined,
+        carbohydrates: recipe.nutrition?.carbs || undefined,
+        fiber: recipe.nutrition?.fiber || undefined,
+        sugar: recipe.nutrition?.sugar || undefined,
+        sodium: recipe.nutrition?.sodium || undefined,
+        calcium: recipe.nutrition?.calcium || undefined,
+        iron: recipe.nutrition?.iron || undefined,
+        vitaminC: recipe.nutrition?.vitaminC || undefined,
+      };
+
+      const success = await appleHealthService.saveMealToHealth(nutritionEntry);
+      if (success) {
+        console.log('Nährwerte erfolgreich zu Apple Health synchronisiert');
+      }
+    } catch (error) {
+      console.error('Fehler bei Health-Synchronisation:', error);
+    }
+  };
+
   // Add a recipe to a specific meal
   const addMealRecipe = async (recipe: Recipe, mealType: 'breakfast' | 'lunch' | 'dinner' | 'snack') => {
     const today = getTodayString();
@@ -173,6 +217,10 @@ export const useNutritionTracking = (userProfile: UserProfile | null) => {
       }
 
       await AsyncStorage.setItem(mealsKey, JSON.stringify(meals));
+      
+      // Sync to Apple Health
+      await syncNutritionToHealth(recipe);
+      
       await loadDailyNutrition(); // Refresh data
     } catch (error) {
       console.error('Error adding meal recipe:', error);

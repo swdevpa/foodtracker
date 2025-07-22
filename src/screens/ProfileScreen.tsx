@@ -13,12 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, ActivityLevel, HealthGoal, JobActivity } from '../types/User';
+import appleHealthService, { HealthData } from '../services/appleHealthService';
 
 export default function ProfileScreen() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
   const [healthKitEnabled, setHealthKitEnabled] = useState(false);
+  const [healthData, setHealthData] = useState<HealthData | null>(null);
+  const [isLoadingHealthData, setIsLoadingHealthData] = useState(false);
 
   useEffect(() => {
     loadUserProfile();

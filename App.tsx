@@ -11,6 +11,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import InventoryScreen from './src/screens/InventoryScreen';
 import RecipesScreen from './src/screens/RecipesScreen';
 import FavoritesScreen from './src/screens/FavoritesScreen';
+import HealthScreen from './src/screens/HealthScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
 
@@ -32,6 +33,8 @@ function TabNavigator() {
             iconName = focused ? 'book' : 'book-outline';
           } else if (route.name === 'Favorites') {
             iconName = focused ? 'heart' : 'heart-outline';
+          } else if (route.name === 'Health') {
+            iconName = focused ? 'fitness' : 'fitness-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           } else {
@@ -49,6 +52,7 @@ function TabNavigator() {
       <Tab.Screen name="Inventory" component={InventoryScreen} />
       <Tab.Screen name="Recipes" component={RecipesScreen} />
       <Tab.Screen name="Favorites" component={FavoritesScreen} />
+      <Tab.Screen name="Health" component={HealthScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
