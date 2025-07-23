@@ -2,8 +2,8 @@ import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Recipe, NutritionInfo, MealPlan } from '../types/Food';
 import { UserProfile } from '../types/User';
-import { NutritionCalculator } from '../utils/nutritionCalculator';
-import appleHealthService, { NutritionEntry } from '../services/appleHealthService';
+import { NutritionCalculator } from '../services/health/nutritionCalculator';
+import appleHealthService, { NutritionEntry } from '../services/health/appleHealthService';
 
 export interface DailyNutrition {
   date: string;

@@ -1,18 +1,11 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
-import Constants from 'expo-constants';
-import { FoodItem, Recipe, MealType, NutritionInfo } from '../types/Food';
-import { UserProfile } from '../types/User';
+import { FoodItem, Recipe, MealType, NutritionInfo } from '../../types/Food';
+import { UserProfile } from '../../types/User';
+import { NutritionCalculator } from '../health/nutritionCalculator';
+import { apiProxyManager } from './apiProxyManager';
 
 class GeminiService {
-  private genAI: GoogleGenerativeAI | null = null;
-
   constructor() {
-    const apiKey = Constants.expoConfig?.extra?.GEMINI_API_KEY;
-    if (apiKey) {
-      this.genAI = new GoogleGenerativeAI(apiKey);
-    } else {
-      console.warn('Gemini API key not found in app.config.js extra');
-    }
+    // API keys are now managed server-side by API Proxy Manager
   }
 
   private calculateTargetNutrition(userProfile: UserProfile): {
@@ -21,70 +14,7 @@ class GeminiService {
     carbs: number;
     fat: number;
   } {
-    // BMR Calculation using Mifflin-St Jeor Equation
-    const { weight, height, age, gender, activityLevel, healthGoal } = userProfile;
-    
-    let bmr: number;
-    if (gender === 'male') {
-      bmr = (10 * weight) + (6.25 * height) - (5 * age) + 5;
-    } else {
-      bmr = (10 * weight) + (6.25 * height) - (5 * age) - 161;
-    }
-
-    // Activity multipliers
-    const activityMultipliers = {
-      'sedentary': 1.2,
-      'lightly_active': 1.375,
-      'moderately_active': 1.55,
-      'very_active': 1.725,
-      'extremely_active': 1.9
-    };
-
-    let targetCalories = bmr * activityMultipliers[activityLevel];
-
-    // Adjust for health goals
-    switch (healthGoal) {
-      case 'weight_loss':
-        targetCalories *= 0.8; // 20% deficit
-        break;
-      case 'weight_gain':
-        targetCalories *= 1.2; // 20% surplus
-        break;
-      case 'muscle_gain':
-        targetCalories *= 1.15; // 15% surplus
-        break;
-      case 'maintenance':
-      default:
-        break;
-    }
-
-    // Macro distribution based on health goal
-    let proteinRatio, carbRatio, fatRatio;
-    
-    switch (healthGoal) {
-      case 'muscle_gain':
-        proteinRatio = 0.3;
-        carbRatio = 0.45;
-        fatRatio = 0.25;
-        break;
-      case 'weight_loss':
-        proteinRatio = 0.35;
-        carbRatio = 0.35;
-        fatRatio = 0.3;
-        break;
-      default:
-        proteinRatio = 0.25;
-        carbRatio = 0.45;
-        fatRatio = 0.3;
-        break;
-    }
-
-    return {
-      calories: Math.round(targetCalories),
-      protein: Math.round((targetCalories * proteinRatio) / 4), // 4 kcal per gram
-      carbs: Math.round((targetCalories * carbRatio) / 4), // 4 kcal per gram
-      fat: Math.round((targetCalories * fatRatio) / 9), // 9 kcal per gram
-    };
+    return NutritionCalculator.calculateTargetMacros(userProfile);
   }
 
   async generateRecipes(
@@ -93,11 +23,6 @@ class GeminiService {
     mealTypes: MealType[],
     servings: number = 1
   ): Promise<Recipe[]> {
-    if (!this.genAI) {
-      throw new Error('Gemini API not initialized');
-    }
-
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     const targetNutrition = this.calculateTargetNutrition(userProfile);
 
     const foodInventory = availableFood.map(food => ({
@@ -181,9 +106,16 @@ Erstelle bitte ${mealTypes.length} Rezept(e) für die gewünschten Mahlzeiten.
 `;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await apiProxyManager.generateWithGemini([{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }], {
+        temperature: 0.7,
+        candidateCount: 1,
+        maxOutputTokens: 2048,
+      });
+      
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       // Extract JSON from response
       const jsonMatch = text.match(/\{[\s\S]*\}/);
@@ -243,11 +175,6 @@ Erstelle bitte ${mealTypes.length} Rezept(e) für die gewünschten Mahlzeiten.
   }
 
   async getCookingTips(recipe: Recipe, userProfile: UserProfile): Promise<string[]> {
-    if (!this.genAI) {
-      throw new Error('Gemini API not initialized');
-    }
-
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
     const prompt = `
 Gib 3-5 kurze, praktische Kochtipps für folgendes Rezept:
@@ -271,9 +198,12 @@ Antwort als einfache Liste, ein Tipp pro Zeile, max. 20 Wörter pro Tipp.
 `;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await apiProxyManager.generateWithGemini([{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }]);
+      
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       return text.split('\n').filter(tip => tip.trim().length > 0).slice(0, 5);
     } catch (error) {
@@ -286,18 +216,12 @@ Antwort als einfache Liste, ein Tipp pro Zeile, max. 20 Wörter pro Tipp.
     analysis: string;
     recommendations: string[];
   }> {
-    if (!this.genAI) {
-      throw new Error('Gemini API not initialized');
-    }
-
     const totalNutrition = recipes.reduce((total, recipe) => ({
       calories: total.calories + recipe.totalNutrition.calories,
       protein: total.protein + recipe.totalNutrition.protein,
       carbs: total.carbs + recipe.totalNutrition.carbs,
       fat: total.fat + recipe.totalNutrition.fat,
     }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
-
-    const model = this.genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
     
     const prompt = `
 Analysiere die Nährstoffbilanz folgender Tagesmahlzeiten:
@@ -328,9 +252,12 @@ EMPFEHLUNGEN:
 `;
 
     try {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
+      const result = await apiProxyManager.generateWithGemini([{
+        role: 'user',
+        parts: [{ text: prompt }]
+      }]);
+      
+      const text = result.candidates?.[0]?.content?.parts?.[0]?.text || '';
       
       const analysisMatch = text.match(/ANALYSE:\s*(.+?)(?=EMPFEHLUNGEN:|$)/s);
       const recommendationsMatch = text.match(/EMPFEHLUNGEN:\s*([\s\S]*)/);

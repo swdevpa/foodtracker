@@ -1,5 +1,5 @@
-import Constants from 'expo-constants';
-import { NutritionInfo } from '../types/Food';
+import { NutritionInfo } from '../../types/Food';
+import { apiProxyManager } from './apiProxyManager';
 
 interface USDAFoodSearchResponse {
   totalHits: number;
@@ -62,20 +62,13 @@ interface USDANutrient {
 
 class USDAService {
   private baseUrl: string;
-  private apiKey: string;
 
   constructor() {
-    this.baseUrl = Constants.expoConfig?.extra?.USDA_API_BASE_URL || 'https://api.nal.usda.gov/fdc/v1';
-    this.apiKey = Constants.expoConfig?.extra?.USDA_API_KEY || '';
-    
-    if (!this.apiKey) {
-      console.warn('USDA API key not found in app.config.js extra');
-    }
+    this.baseUrl = 'https://api.nal.usda.gov/fdc/v1';
   }
 
   private async makeRequest(endpoint: string, params: Record<string, any> = {}): Promise<any> {
     const url = new URL(`${this.baseUrl}${endpoint}`);
-    url.searchParams.append('api_key', this.apiKey);
     
     Object.entries(params).forEach(([key, value]) => {
       if (value !== undefined && value !== null) {
@@ -84,13 +77,7 @@ class USDAService {
     });
 
     try {
-      const response = await fetch(url.toString());
-      
-      if (!response.ok) {
-        throw new Error(`USDA API Error: ${response.status} ${response.statusText}`);
-      }
-      
-      return await response.json();
+      return await apiProxyManager.proxyRequest(url.toString());
     } catch (error) {
       console.error('USDA API request failed:', error);
       throw error;
@@ -195,7 +182,7 @@ class USDAService {
     
     try {
       // USDA API supports bulk requests with POST
-      const response = await fetch(`${this.baseUrl}/foods`, {
+      const foods: USDAFoodDetails[] = await apiProxyManager.proxyRequest(`${this.baseUrl}/foods`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -206,12 +193,6 @@ class USDAService {
           nutrients: [1008, 1003, 1005, 1004, 1079, 2000, 1093, 1087, 1089] // Key nutrient IDs
         })
       });
-
-      if (!response.ok) {
-        throw new Error(`USDA bulk request failed: ${response.status}`);
-      }
-
-      const foods: USDAFoodDetails[] = await response.json();
       
       foods.forEach(food => {
         const nutrition = this.convertUSDANutrientsToNutritionInfo(food.foodNutrients);

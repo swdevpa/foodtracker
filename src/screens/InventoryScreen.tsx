@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FoodItem, FoodCategory, FoodUnit, FoodLocation } from '../types/Food';
-import usdaService from '../services/usdaService';
+import usdaService from '../services/api/usdaService';
 
 export default function InventoryScreen() {
   const [inventory, setInventory] = useState<FoodItem[]>([]);

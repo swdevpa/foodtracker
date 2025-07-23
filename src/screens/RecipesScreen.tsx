@@ -14,7 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FoodItem, Recipe, MealType } from '../types/Food';
 import { UserProfile } from '../types/User';
-import geminiService from '../services/geminiService';
+import geminiService from '../services/api/geminiService';
 import { useFavorites } from '../hooks/useFavorites';
 
 export default function RecipesScreen() {

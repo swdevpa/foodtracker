@@ -12,7 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import appleHealthService, { HealthData } from '../services/appleHealthService';
+import appleHealthService, { HealthData } from '../services/health/appleHealthService';
 
 export default function HealthScreen() {
   const [isLoading, setIsLoading] = useState(false);

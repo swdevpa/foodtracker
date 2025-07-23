@@ -1,5 +1,5 @@
-import { UserProfile } from '../types/User';
-import { Recipe, NutritionInfo, MealPlan } from '../types/Food';
+import { UserProfile } from '../../types/User';
+import { Recipe, NutritionInfo, MealPlan } from '../../types/Food';
 
 export class NutritionCalculator {
   

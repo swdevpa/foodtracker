@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserProfile, ActivityLevel, HealthGoal, JobActivity } from '../types/User';
-import appleHealthService, { HealthData } from '../services/appleHealthService';
+import appleHealthService, { HealthData } from '../services/health/appleHealthService';
 
 export default function ProfileScreen() {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
