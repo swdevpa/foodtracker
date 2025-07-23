@@ -59,82 +59,82 @@ interface GeminiResponse {
   };
 }
 
-// USDA API Types
-interface USDASearchResult {
-  totalHits: number;
-  currentPage: number;
-  totalPages: number;
-  pageList: number[];
-  foodSearchCriteria: {
-    query: string;
-    dataType: string[];
-    pageSize: number;
-    pageNumber: number;
-    sortBy: string;
-    sortOrder: string;
+// FatSecret API Types
+interface FatSecretSearchResult {
+  foods: {
+    food: FatSecretFood[];
+    max_results: string;
+    page_number: string;
+    total_results: string;
   };
-  foods: USDAFood[];
 }
 
-interface USDAFood {
-  fdcId: number;
-  description: string;
-  dataType: string;
-  gtinUpc?: string;
-  publishedDate: string;
-  brandOwner?: string;
-  brandName?: string;
-  ingredients?: string;
-  marketCountry?: string;
-  foodCategory?: string;
-  modifiedDate?: string;
-  dataSource?: string;
-  packageWeight?: string;
-  servingSizeUnit?: string;
-  servingSize?: number;
-  householdServingFullText?: string;
-  allHighlightFields?: string;
-  score?: number;
+interface FatSecretFood {
+  food_id: string;
+  food_name: string;
+  food_type: string;
+  food_url: string;
+  brand_name?: string;
 }
 
-interface USDANutrient {
-  id: number;
-  number: string;
-  name: string;
-  rank: number;
-  unitName: string;
+interface FatSecretNutrient {
+  calories: string;
+  carbohydrate: string;
+  protein: string;
+  fat: string;
+  saturated_fat?: string;
+  polyunsaturated_fat?: string;
+  monounsaturated_fat?: string;
+  trans_fat?: string;
+  cholesterol?: string;
+  sodium?: string;
+  potassium?: string;
+  fiber?: string;
+  sugar?: string;
+  vitamin_a?: string;
+  vitamin_c?: string;
+  calcium?: string;
+  iron?: string;
 }
 
-interface USDAFoodNutrient {
-  type: string;
-  id: number;
-  nutrient: USDANutrient;
-  amount: number;
+interface FatSecretServing {
+  serving_id: string;
+  serving_description: string;
+  serving_url: string;
+  metric_serving_amount?: string;
+  metric_serving_unit?: string;
+  number_of_units?: string;
+  measurement_description: string;
+  calories: string;
+  carbohydrate: string;
+  protein: string;
+  fat: string;
+  saturated_fat?: string;
+  polyunsaturated_fat?: string;
+  monounsaturated_fat?: string;
+  trans_fat?: string;
+  cholesterol?: string;
+  sodium?: string;
+  potassium?: string;
+  fiber?: string;
+  sugar?: string;
+  vitamin_a?: string;
+  vitamin_c?: string;
+  calcium?: string;
+  iron?: string;
 }
 
-interface USDAFoodDetail {
-  fdcId: number;
-  description: string;
-  dataType: string;
-  publicationDate: string;
-  foodNutrients: USDAFoodNutrient[];
-  foodClass?: string;
-  modifiedDate?: string;
-  availableDate?: string;
-  brandOwner?: string;
-  brandName?: string;
-  dataSource?: string;
-  ingredients?: string;
-  marketCountry?: string;
-  foodCategory?: string;
-  allHighlightFields?: string;
-  score?: number;
-  microbes?: any[];
-  foodComponents?: any[];
-  foodAttributes?: any[];
-  foodPortions?: any[];
-  inputFoods?: any[];
-  wweiaFoodCategory?: any;
+interface FatSecretFoodDetail {
+  food: {
+    food_id: string;
+    food_name: string;
+    food_type: string;
+    food_url: string;
+    brand_name?: string;
+    servings: {
+      serving: FatSecretServing | FatSecretServing[];
+    };
+  };
 }
 
 type ApiProxyError = {
@@ -311,165 +311,103 @@ class ApiProxyManagerService {
     });
   }
 
-  // === USDA API METHODS ===
+  // === FATSECRET API METHODS ===
   
   /**
-   * Search for foods in the USDA database
+   * Search for foods in the FatSecret database
    */
   async searchFoods(
     query: string,
     options: {
-      pageSize?: number;
       pageNumber?: number;
-      dataType?: ('Branded' | 'Foundation' | 'Survey' | 'SR Legacy')[];
-      sortBy?: 'dataType.keyword' | 'description.keyword' | 'fdcId' | 'publishedDate';
-      sortOrder?: 'asc' | 'desc';
-      brandOwner?: string;
-      tradeChannel?: string[];
-      startDate?: string;
-      endDate?: string;
+      maxResults?: number;
     } = {}
-  ): Promise<USDASearchResult> {
+  ): Promise<FatSecretSearchResult> {
     const params = new URLSearchParams({
-      query,
-      pageSize: (options.pageSize || 25).toString(),
-      pageNumber: (options.pageNumber || 1).toString(),
+      method: 'foods.search',
+      format: 'json',
+      search_expression: query,
+      page_number: (options.pageNumber || 0).toString(),
+      max_results: (options.maxResults || 50).toString(),
     });
 
-    if (options.dataType && options.dataType.length > 0) {
-      options.dataType.forEach(type => params.append('dataType', type));
-    }
-
-    if (options.sortBy) {
-      params.append('sortBy', options.sortBy);
-    }
-
-    if (options.sortOrder) {
-      params.append('sortOrder', options.sortOrder);
-    }
-
-    if (options.brandOwner) {
-      params.append('brandOwner', options.brandOwner);
-    }
-
-    if (options.tradeChannel && options.tradeChannel.length > 0) {
-      options.tradeChannel.forEach(channel => params.append('tradeChannel', channel));
-    }
-
-    if (options.startDate) {
-      params.append('startDate', options.startDate);
-    }
-
-    if (options.endDate) {
-      params.append('endDate', options.endDate);
-    }
-
-    return this.makeRequest<USDASearchResult>({
-      targetUrl: `https://api.nal.usda.gov/fdc/v1/foods/search?${params.toString()}`,
+    return this.makeRequest<FatSecretSearchResult>({
+      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
       method: 'GET'
     });
   }
 
   /**
-   * Get detailed food information by FDC ID
+   * Get detailed food information by Food ID
    */
-  async getFoodDetails(
-    fdcId: number,
-    nutrients?: number[]
-  ): Promise<USDAFoodDetail> {
-    let url = `https://api.nal.usda.gov/fdc/v1/food/${fdcId}`;
-    
-    if (nutrients && nutrients.length > 0) {
-      const params = new URLSearchParams();
-      nutrients.forEach(nutrientId => params.append('nutrients', nutrientId.toString()));
-      url += `?${params.toString()}`;
-    }
+  async getFoodDetails(foodId: string): Promise<FatSecretFoodDetail> {
+    const params = new URLSearchParams({
+      method: 'food.get.v4',
+      format: 'json',
+      food_id: foodId,
+    });
 
-    return this.makeRequest<USDAFoodDetail>({
-      targetUrl: url,
+    return this.makeRequest<FatSecretFoodDetail>({
+      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
       method: 'GET'
     });
   }
 
   /**
-   * Get multiple foods by FDC IDs
+   * Search foods by barcode
    */
-  async getFoodsByIds(
-    fdcIds: number[],
-    nutrients?: number[]
-  ): Promise<USDAFoodDetail[]> {
-    const body: any = {
-      fdcIds,
-      format: 'abridged'
+  async searchFoodsByBarcode(barcode: string): Promise<FatSecretFoodDetail> {
+    const params = new URLSearchParams({
+      method: 'food.find_id_for_barcode',
+      format: 'json',
+      barcode: barcode,
+    });
+
+    return this.makeRequest<FatSecretFoodDetail>({
+      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
+      method: 'GET'
+    });
+  }
+
+  /**
+   * Get autocomplete suggestions for food search
+   */
+  async getFoodAutoComplete(expression: string): Promise<{
+    suggestions: {
+      suggestion: string[];
     };
-
-    if (nutrients && nutrients.length > 0) {
-      body.nutrients = nutrients;
-    }
-
-    return this.makeRequest<USDAFoodDetail[]>({
-      targetUrl: 'https://api.nal.usda.gov/fdc/v1/foods',
-      method: 'POST',
-      body
-    });
-  }
-
-  /**
-   * Get list of available nutrients
-   */
-  async getNutrients(
-    pageSize: number = 50,
-    pageNumber: number = 1
-  ): Promise<{
-    nutrients: USDANutrient[];
-    totalCount: number;
-    currentPage: number;
-    totalPages: number;
   }> {
     const params = new URLSearchParams({
-      pageSize: pageSize.toString(),
-      pageNumber: pageNumber.toString()
+      method: 'foods.autocomplete',
+      format: 'json',
+      expression: expression,
     });
 
     return this.makeRequest({
-      targetUrl: `https://api.nal.usda.gov/fdc/v1/nutrients?${params.toString()}`,
+      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
       method: 'GET'
     });
   }
 
   /**
-   * Search foods by UPC/GTIN code
-   */
-  async searchFoodsByGtin(gtin: string): Promise<USDASearchResult> {
-    return this.searchFoods('', {
-      pageSize: 25,
-      dataType: ['Branded']
-    }).then(async () => {
-      // Note: Direct GTIN search requires different endpoint approach
-      const params = new URLSearchParams({
-        gtinUpc: gtin,
-        pageSize: '25'
-      });
-      
-      return this.makeRequest<USDASearchResult>({
-        targetUrl: `https://api.nal.usda.gov/fdc/v1/foods/search?${params.toString()}`,
-        method: 'GET'
-      });
-    });
-  }
-
-  /**
-   * Get food categories/food groups
+   * Get food categories/food groups from FatSecret
    */
   async getFoodCategories(): Promise<{
-    foodCategories: Array<{
-      id: number;
-      code: string;
-      description: string;
-    }>;
+    food_categories: {
+      food_category: Array<{
+        food_category_id: string;
+        food_category_name: string;
+        food_category_description: string;
+      }>;
+    };
   }> {
+    const params = new URLSearchParams({
+      method: 'food_categories.get',
+      format: 'json',
+    });
+
     return this.makeRequest({
-      targetUrl: 'https://api.nal.usda.gov/fdc/v1/food-categories',
+      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
       method: 'GET'
     });
   }
@@ -477,8 +415,8 @@ class ApiProxyManagerService {
   /**
    * Alias for getFoodDetails to maintain backwards compatibility
    */
-  async getFoodNutrition(fdcId: number): Promise<USDAFoodDetail> {
-    return this.getFoodDetails(fdcId);
+  async getFoodNutrition(foodId: string): Promise<FatSecretFoodDetail> {
+    return this.getFoodDetails(foodId);
   }
 
   // === UTILITY METHODS ===

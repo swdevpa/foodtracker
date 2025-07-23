@@ -7,7 +7,7 @@ export interface FoodItem {
   unit: FoodUnit;
   expirationDate?: Date;
   location: FoodLocation;
-  fdcId?: number; // USDA FoodData Central ID
+  foodId?: string; // FatSecret Food ID
   nutritionPer100g?: NutritionInfo;
   addedAt: Date;
   updatedAt: Date;

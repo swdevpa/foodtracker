@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { FoodItem, FoodCategory, FoodUnit, FoodLocation } from '../types/Food';
-import usdaService from '../services/api/usdaService';
+import fatSecretService from '../services/api/fatSecretService';
 
 export default function InventoryScreen() {
   const [inventory, setInventory] = useState<FoodItem[]>([]);
@@ -24,7 +24,7 @@ export default function InventoryScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [foodSearchModalVisible, setFoodSearchModalVisible] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [usdaSearchQuery, setUsdaSearchQuery] = useState('');
+  const [fatSecretSearchQuery, setFatSecretSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [selectedFood, setSelectedFood] = useState<any>(null);
   const [newItem, setNewItem] = useState<Partial<FoodItem>>({
@@ -85,8 +85,8 @@ export default function InventoryScreen() {
     setFilteredInventory(filtered);
   };
 
-  // USDA Food Search Functions
-  const searchUSDAFoods = async (query: string) => {
+  // FatSecret Food Search Functions
+  const searchFatSecretFoods = async (query: string) => {
     if (!query.trim()) {
       setSearchResults([]);
       return;
@@ -94,10 +94,10 @@ export default function InventoryScreen() {
 
     setIsSearching(true);
     try {
-      const results = await usdaService.searchFoods(query, 20);
+      const results = await fatSecretService.searchFoods(query, 20);
       setSearchResults(results);
     } catch (error) {
-      console.error('Error searching USDA foods:', error);
+      console.error('Error searching FatSecret foods:', error);
       Alert.alert('Fehler', 'Lebensmittel-Suche fehlgeschlagen');
       setSearchResults([]);
     } finally {
@@ -105,23 +105,23 @@ export default function InventoryScreen() {
     }
   };
 
-  const selectUSDAFood = async (usdaFood: any) => {
-    setSelectedFood(usdaFood);
+  const selectFatSecretFood = async (fatSecretFood: any) => {
+    setSelectedFood(fatSecretFood);
     
     // Try to get nutrition info
     try {
-      const nutrition = await usdaService.getFoodNutrition(usdaFood.fdcId);
+      const nutrition = await fatSecretService.getFoodNutrition(fatSecretFood.food_id);
       
       // Auto-categorize based on food name/category
-      const category = categorizeUSDAFood(usdaFood);
+      const category = categorizeFatSecretFood(fatSecretFood);
       
       setNewItem({
-        name: usdaFood.description,
+        name: fatSecretFood.food_name,
         category,
         quantity: 1,
         unit: 'g',
         location: 'fridge',
-        fdcId: usdaFood.fdcId,
+        foodId: fatSecretFood.food_id,
         nutritionPer100g: nutrition,
       });
       
@@ -130,15 +130,15 @@ export default function InventoryScreen() {
     } catch (error) {
       console.error('Error getting nutrition info:', error);
       // Continue without nutrition info
-      const category = categorizeUSDAFood(usdaFood);
+      const category = categorizeFatSecretFood(fatSecretFood);
       
       setNewItem({
-        name: usdaFood.description,
+        name: fatSecretFood.food_name,
         category,
         quantity: 1,
         unit: 'g',
         location: 'fridge',
-        fdcId: usdaFood.fdcId,
+        foodId: fatSecretFood.food_id,
       });
       
       setFoodSearchModalVisible(false);
@@ -146,35 +146,36 @@ export default function InventoryScreen() {
     }
   };
 
-  const categorizeUSDAFood = (usdaFood: any): FoodCategory => {
-    const name = usdaFood.description.toLowerCase();
-    const category = usdaFood.foodCategory?.toLowerCase() || '';
+  const categorizeFatSecretFood = (fatSecretFood: any): FoodCategory => {
+    const name = fatSecretFood.food_name.toLowerCase();
+    const type = fatSecretFood.food_type?.toLowerCase() || '';
+    const brand = fatSecretFood.brand_name?.toLowerCase() || '';
     
-    if (name.includes('milk') || name.includes('cheese') || name.includes('yogurt') || category.includes('dairy')) {
+    if (name.includes('milk') || name.includes('cheese') || name.includes('yogurt') || name.includes('butter') || name.includes('cream')) {
       return 'dairy';
     }
-    if (name.includes('meat') || name.includes('beef') || name.includes('chicken') || name.includes('pork') || category.includes('meat')) {
+    if (name.includes('meat') || name.includes('beef') || name.includes('chicken') || name.includes('pork') || name.includes('lamb') || name.includes('bacon')) {
       return 'meat';
     }
-    if (name.includes('apple') || name.includes('banana') || name.includes('orange') || category.includes('fruit')) {
+    if (name.includes('apple') || name.includes('banana') || name.includes('orange') || name.includes('grape') || name.includes('berry') || name.includes('fruit')) {
       return 'fruits';
     }
-    if (name.includes('carrot') || name.includes('broccoli') || name.includes('spinach') || category.includes('vegetable')) {
+    if (name.includes('carrot') || name.includes('broccoli') || name.includes('spinach') || name.includes('tomato') || name.includes('lettuce') || name.includes('vegetable')) {
       return 'vegetables';
     }
-    if (name.includes('bread') || name.includes('rice') || name.includes('pasta') || category.includes('grain')) {
+    if (name.includes('bread') || name.includes('rice') || name.includes('pasta') || name.includes('wheat') || name.includes('cereal') || name.includes('oat')) {
       return 'grains';
     }
-    if (name.includes('egg') || name.includes('fish') || name.includes('tofu') || category.includes('protein')) {
+    if (name.includes('egg') || name.includes('fish') || name.includes('tofu') || name.includes('salmon') || name.includes('tuna') || name.includes('protein')) {
       return 'proteins';
     }
-    if (name.includes('juice') || name.includes('water') || name.includes('soda') || category.includes('beverage')) {
+    if (name.includes('juice') || name.includes('water') || name.includes('soda') || name.includes('coffee') || name.includes('tea') || name.includes('drink')) {
       return 'beverages';
     }
-    if (name.includes('chip') || name.includes('cookie') || name.includes('candy') || category.includes('snack')) {
+    if (name.includes('chip') || name.includes('cookie') || name.includes('candy') || name.includes('chocolate') || name.includes('snack') || name.includes('cake')) {
       return 'snacks';
     }
-    if (name.includes('salt') || name.includes('pepper') || name.includes('herb') || category.includes('spice')) {
+    if (name.includes('salt') || name.includes('pepper') || name.includes('herb') || name.includes('spice') || name.includes('seasoning')) {
       return 'spices';
     }
     
@@ -484,7 +485,7 @@ export default function InventoryScreen() {
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={() => {
             setFoodSearchModalVisible(false);
-            setUsdaSearchQuery('');
+            setFatSecretSearchQuery('');
             setSearchResults([]);
           }}>
             <Text style={styles.modalCancelButton}>Abbrechen</Text>
@@ -499,11 +500,11 @@ export default function InventoryScreen() {
             <TextInput
               style={styles.searchInput}
               placeholder="z.B. Äpfel, Milch, Brot..."
-              value={usdaSearchQuery}
+              value={fatSecretSearchQuery}
               onChangeText={(text) => {
-                setUsdaSearchQuery(text);
+                setFatSecretSearchQuery(text);
                 if (text.length > 2) {
-                  searchUSDAFoods(text);
+                  searchFatSecretFoods(text);
                 } else {
                   setSearchResults([]);
                 }
@@ -518,22 +519,22 @@ export default function InventoryScreen() {
 
         <FlatList
           data={searchResults}
-          keyExtractor={(item) => item.fdcId.toString()}
+          keyExtractor={(item) => item.food_id.toString()}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.searchResultItem}
-              onPress={() => selectUSDAFood(item)}
+              onPress={() => selectFatSecretFood(item)}
             >
               <View style={styles.searchResultInfo}>
                 <Text style={styles.searchResultName} numberOfLines={2}>
-                  {item.description}
+                  {item.food_name}
                 </Text>
                 <Text style={styles.searchResultCategory}>
-                  {item.foodCategory || 'Keine Kategorie'}
+                  {item.food_type || 'Keine Kategorie'}
                 </Text>
-                {item.brandOwner && (
+                {item.brand_name && (
                   <Text style={styles.searchResultBrand}>
-                    {item.brandOwner}
+                    {item.brand_name}
                   </Text>
                 )}
               </View>
@@ -543,7 +544,7 @@ export default function InventoryScreen() {
           contentContainerStyle={styles.searchResultsList}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            !isSearching && usdaSearchQuery.length > 2 ? (
+            !isSearching && fatSecretSearchQuery.length > 2 ? (
               <View style={styles.emptySearchContainer}>
                 <Ionicons name="search-outline" size={48} color="#ccc" />
                 <Text style={styles.emptySearchText}>
@@ -553,14 +554,14 @@ export default function InventoryScreen() {
                   Versuche andere Suchbegriffe
                 </Text>
               </View>
-            ) : usdaSearchQuery.length <= 2 ? (
+            ) : fatSecretSearchQuery.length <= 2 ? (
               <View style={styles.emptySearchContainer}>
                 <Ionicons name="restaurant-outline" size={48} color="#ccc" />
                 <Text style={styles.emptySearchText}>
-                  USDA Lebensmittel-Datenbank
+                  FatSecret Lebensmittel-Datenbank
                 </Text>
                 <Text style={styles.emptySearchSubtext}>
-                  Suche nach über 350.000 Lebensmitteln mit genauen Nährstoffangaben
+                  Suche nach Millionen von Lebensmitteln mit detaillierten Nährstoffangaben
                 </Text>
               </View>
             ) : null
