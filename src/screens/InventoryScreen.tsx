@@ -13,8 +13,9 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { BarCodeScanner } from 'expo-barcode-scanner';
 import { FoodItem, FoodCategory, FoodUnit, FoodLocation } from '../types/Food';
-import fatSecretService from '../services/api/fatSecretService';
+import { openfoodfactsService } from '../services/api/openfoodfactsService';
 
 export default function InventoryScreen() {
   const [inventory, setInventory] = useState<FoodItem[]>([]);
@@ -24,9 +25,9 @@ export default function InventoryScreen() {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [foodSearchModalVisible, setFoodSearchModalVisible] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [fatSecretSearchQuery, setFatSecretSearchQuery] = useState('');
-  const [isSearching, setIsSearching] = useState(false);
   const [selectedFood, setSelectedFood] = useState<any>(null);
+  const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
+  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [newItem, setNewItem] = useState<Partial<FoodItem>>({
     name: '',
     category: 'other',
@@ -34,10 +35,18 @@ export default function InventoryScreen() {
     unit: 'g',
     location: 'fridge',
   });
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     loadInventory();
+    getBarCodeScannerPermissions();
   }, []);
+
+  const getBarCodeScannerPermissions = async () => {
+    const { status } = await BarCodeScanner.requestPermissionsAsync();
+    setHasPermission(status === 'granted');
+  };
 
   useEffect(() => {
     filterInventory();
@@ -85,101 +94,52 @@ export default function InventoryScreen() {
     setFilteredInventory(filtered);
   };
 
-  // FatSecret Food Search Functions
-  const searchFatSecretFoods = async (query: string) => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
+  const searchFoods = async (query: string) => {
     setIsSearching(true);
     try {
-      const results = await fatSecretService.searchFoods(query, 20);
+      const results = await openfoodfactsService.searchFoods(query);
       setSearchResults(results);
     } catch (error) {
-      console.error('Error searching FatSecret foods:', error);
-      Alert.alert('Fehler', 'Lebensmittel-Suche fehlgeschlagen');
+      console.error('Error searching foods:', error);
       setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const selectFatSecretFood = async (fatSecretFood: any) => {
-    setSelectedFood(fatSecretFood);
-    
-    // Try to get nutrition info
+  const searchByBarcode = async (barcode: string) => {
+    setIsSearching(true);
     try {
-      const nutrition = await fatSecretService.getFoodNutrition(fatSecretFood.food_id);
-      
-      // Auto-categorize based on food name/category
-      const category = categorizeFatSecretFood(fatSecretFood);
-      
-      setNewItem({
-        name: fatSecretFood.food_name,
-        category,
-        quantity: 1,
-        unit: 'g',
-        location: 'fridge',
-        foodId: fatSecretFood.food_id,
-        nutritionPer100g: nutrition,
-      });
-      
-      setFoodSearchModalVisible(false);
-      setAddModalVisible(true);
+      const result = await openfoodfactsService.getProductByBarcode(barcode);
+      if (result) {
+        setSearchResults([result]);
+      } else {
+        Alert.alert('Produkt nicht gefunden', 'Kein Produkt mit diesem Barcode gefunden.');
+        setSearchResults([]);
+      }
     } catch (error) {
-      console.error('Error getting nutrition info:', error);
-      // Continue without nutrition info
-      const category = categorizeFatSecretFood(fatSecretFood);
-      
-      setNewItem({
-        name: fatSecretFood.food_name,
-        category,
-        quantity: 1,
-        unit: 'g',
-        location: 'fridge',
-        foodId: fatSecretFood.food_id,
-      });
-      
-      setFoodSearchModalVisible(false);
-      setAddModalVisible(true);
+      console.error('Error searching by barcode:', error);
+      Alert.alert('Fehler', 'Fehler beim Suchen des Produkts');
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
     }
   };
 
-  const categorizeFatSecretFood = (fatSecretFood: any): FoodCategory => {
-    const name = fatSecretFood.food_name.toLowerCase();
-    const type = fatSecretFood.food_type?.toLowerCase() || '';
-    const brand = fatSecretFood.brand_name?.toLowerCase() || '';
-    
-    if (name.includes('milk') || name.includes('cheese') || name.includes('yogurt') || name.includes('butter') || name.includes('cream')) {
-      return 'dairy';
-    }
-    if (name.includes('meat') || name.includes('beef') || name.includes('chicken') || name.includes('pork') || name.includes('lamb') || name.includes('bacon')) {
-      return 'meat';
-    }
-    if (name.includes('apple') || name.includes('banana') || name.includes('orange') || name.includes('grape') || name.includes('berry') || name.includes('fruit')) {
-      return 'fruits';
-    }
-    if (name.includes('carrot') || name.includes('broccoli') || name.includes('spinach') || name.includes('tomato') || name.includes('lettuce') || name.includes('vegetable')) {
-      return 'vegetables';
-    }
-    if (name.includes('bread') || name.includes('rice') || name.includes('pasta') || name.includes('wheat') || name.includes('cereal') || name.includes('oat')) {
-      return 'grains';
-    }
-    if (name.includes('egg') || name.includes('fish') || name.includes('tofu') || name.includes('salmon') || name.includes('tuna') || name.includes('protein')) {
-      return 'proteins';
-    }
-    if (name.includes('juice') || name.includes('water') || name.includes('soda') || name.includes('coffee') || name.includes('tea') || name.includes('drink')) {
-      return 'beverages';
-    }
-    if (name.includes('chip') || name.includes('cookie') || name.includes('candy') || name.includes('chocolate') || name.includes('snack') || name.includes('cake')) {
-      return 'snacks';
-    }
-    if (name.includes('salt') || name.includes('pepper') || name.includes('herb') || name.includes('spice') || name.includes('seasoning')) {
-      return 'spices';
-    }
-    
-    return 'other';
+  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+    setBarcodeScannerVisible(false);
+    searchByBarcode(data);
+  };
+
+  const selectFood = (item: any) => {
+    setSelectedFood(item);
+    setNewItem({
+      ...newItem,
+      name: item.product_name,
+      category: (item.categories && typeof item.categories === 'string' ? item.categories.split(',')[0] : null) || 'other',
+      unit: item.serving_size?.match(/\d+/) ? 'g' : 'pieces',
+    });
+    setFoodSearchModalVisible(false);
   };
 
   const addItem = () => {
@@ -485,7 +445,7 @@ export default function InventoryScreen() {
         <View style={styles.modalHeader}>
           <TouchableOpacity onPress={() => {
             setFoodSearchModalVisible(false);
-            setFatSecretSearchQuery('');
+            setSearchQuery('');
             setSearchResults([]);
           }}>
             <Text style={styles.modalCancelButton}>Abbrechen</Text>
@@ -500,11 +460,11 @@ export default function InventoryScreen() {
             <TextInput
               style={styles.searchInput}
               placeholder="z.B. Äpfel, Milch, Brot..."
-              value={fatSecretSearchQuery}
+              value={searchQuery}
               onChangeText={(text) => {
-                setFatSecretSearchQuery(text);
+                setSearchQuery(text);
                 if (text.length > 2) {
-                  searchFatSecretFoods(text);
+                  searchFoods(text);
                 } else {
                   setSearchResults([]);
                 }
@@ -519,22 +479,22 @@ export default function InventoryScreen() {
 
         <FlatList
           data={searchResults}
-          keyExtractor={(item) => item.food_id.toString()}
+          keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.searchResultItem}
-              onPress={() => selectFatSecretFood(item)}
+              onPress={() => selectFood(item)}
             >
               <View style={styles.searchResultInfo}>
                 <Text style={styles.searchResultName} numberOfLines={2}>
-                  {item.food_name}
+                  {item.product_name}
                 </Text>
                 <Text style={styles.searchResultCategory}>
-                  {item.food_type || 'Keine Kategorie'}
+                  {(item.categories && typeof item.categories === 'string' ? item.categories.split(',')[0] : null) || 'Keine Kategorie'}
                 </Text>
-                {item.brand_name && (
+                {item.brands && (
                   <Text style={styles.searchResultBrand}>
-                    {item.brand_name}
+                    {item.brands && Array.isArray(item.brands) ? item.brands.join(', ') : 'Unbekannte Marke'}
                   </Text>
                 )}
               </View>
@@ -544,7 +504,7 @@ export default function InventoryScreen() {
           contentContainerStyle={styles.searchResultsList}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
-            !isSearching && fatSecretSearchQuery.length > 2 ? (
+            !isSearching && searchQuery.length > 2 ? (
               <View style={styles.emptySearchContainer}>
                 <Ionicons name="search-outline" size={48} color="#ccc" />
                 <Text style={styles.emptySearchText}>
@@ -554,19 +514,66 @@ export default function InventoryScreen() {
                   Versuche andere Suchbegriffe
                 </Text>
               </View>
-            ) : fatSecretSearchQuery.length <= 2 ? (
+            ) : searchQuery.length <= 2 ? (
               <View style={styles.emptySearchContainer}>
                 <Ionicons name="restaurant-outline" size={48} color="#ccc" />
                 <Text style={styles.emptySearchText}>
-                  FatSecret Lebensmittel-Datenbank
+                  OpenFoodFacts Lebensmittel-Datenbank
                 </Text>
                 <Text style={styles.emptySearchSubtext}>
-                  Suche nach Millionen von Lebensmitteln mit detaillierten Nährstoffangaben
+                  Suche nach Lebensmitteln mit detaillierten Nährstoffangaben
                 </Text>
               </View>
             ) : null
           }
         />
+      </SafeAreaView>
+    </Modal>
+  );
+
+  const renderBarcodeScannerModal = () => (
+    <Modal
+      visible={barcodeScannerVisible}
+      animationType="slide"
+      presentationStyle="fullScreen"
+    >
+      <SafeAreaView style={styles.scannerContainer}>
+        <View style={styles.scannerHeader}>
+          <TouchableOpacity onPress={() => setBarcodeScannerVisible(false)}>
+            <Text style={styles.modalCancelButton}>Abbrechen</Text>
+          </TouchableOpacity>
+          <Text style={styles.modalTitle}>Barcode scannen</Text>
+          <View style={{ width: 80 }} />
+        </View>
+        
+        {hasPermission === null ? (
+          <View style={styles.permissionContainer}>
+            <Text>Kamera-Berechtigung wird angefordert...</Text>
+          </View>
+        ) : hasPermission === false ? (
+          <View style={styles.permissionContainer}>
+            <Text>Keine Kamera-Berechtigung</Text>
+            <TouchableOpacity
+              style={styles.permissionButton}
+              onPress={getBarCodeScannerPermissions}
+            >
+              <Text style={styles.permissionButtonText}>Berechtigung anfordern</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <>
+            <BarCodeScanner
+              onBarCodeScanned={handleBarCodeScanned}
+              style={styles.scanner}
+            />
+            <View style={styles.scannerOverlay}>
+              <View style={styles.scannerFrame} />
+              <Text style={styles.scannerInstructions}>
+                Richte die Kamera auf den Barcode des Produkts
+              </Text>
+            </View>
+          </>
+        )}
       </SafeAreaView>
     </Modal>
   );
@@ -581,6 +588,20 @@ export default function InventoryScreen() {
             onPress={() => setFoodSearchModalVisible(true)}
           >
             <Ionicons name="search" size={20} color="#2E7D32" />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.barcodeButton}
+            onPress={() => {
+              if (hasPermission === null) {
+                getBarCodeScannerPermissions();
+              } else if (hasPermission === false) {
+                Alert.alert('Keine Berechtigung', 'Kamera-Berechtigung ist erforderlich für das Scannen von Barcodes.');
+              } else {
+                setBarcodeScannerVisible(true);
+              }
+            }}
+          >
+            <Ionicons name="barcode-outline" size={20} color="#2E7D32" />
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addButton}
@@ -624,6 +645,7 @@ export default function InventoryScreen() {
 
       {renderAddModal()}
       {renderFoodSearchModal()}
+      {renderBarcodeScannerModal()}
     </SafeAreaView>
   );
 }
@@ -650,6 +672,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   searchButton: {
+    backgroundColor: '#E8F5E8',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  barcodeButton: {
     backgroundColor: '#E8F5E8',
     borderRadius: 20,
     width: 40,
@@ -993,5 +1024,63 @@ const styles = StyleSheet.create({
     color: '#ccc',
     textAlign: 'center',
     marginTop: 8,
+  },
+  scannerContainer: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  scannerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+  },
+  scanner: {
+    flex: 1,
+  },
+  scannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  scannerFrame: {
+    width: 250,
+    height: 250,
+    borderWidth: 2,
+    borderColor: '#fff',
+    borderRadius: 10,
+    backgroundColor: 'transparent',
+  },
+  scannerInstructions: {
+    color: '#fff',
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 20,
+    paddingHorizontal: 40,
+  },
+  permissionContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 40,
+  },
+  permissionButton: {
+    backgroundColor: '#2E7D32',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  permissionButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

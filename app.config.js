@@ -24,6 +24,7 @@ export default {
         NSHealthShareUsageDescription: "This app uses HealthKit to import your health data like weight, height, and activity to provide personalized meal recommendations.",
         NSHealthUpdateUsageDescription: "This app uses HealthKit to save nutritional information from your meals to your Health app.",
         NSHealthClinicalHealthRecordsShareUsageDescription: "This app does not access clinical health records.",
+        NSCameraUsageDescription: "This app uses the camera to scan barcodes for adding food items to your inventory.",
         ITSAppUsesNonExemptEncryption: false
       },
       entitlements: {
@@ -48,6 +49,12 @@ export default {
           isClinicalDataEnabled: false,
           healthSharePermission: "This app uses HealthKit to import your health data like weight, height, and activity to provide personalized meal recommendations.",
           healthUpdatePermission: "This app uses HealthKit to save nutritional information from your meals to your Health app."
+        }
+      ],
+      [
+        "expo-barcode-scanner",
+        {
+          cameraPermission: "Allow $(PRODUCT_NAME) to access camera to scan barcodes for food items."
         }
       ]
     ],

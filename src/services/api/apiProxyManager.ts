@@ -1,11 +1,15 @@
 /**
  * API Proxy Manager Service
- * Complete implementation for Gemini and USDA APIs through swdev-pa API Proxy Manager
+ * Implementation for OpenFoodFacts APIs through swdev-pa API Proxy Manager
  */
+
+import { openfoodfactsService } from './openfoodfactsService';
+import { FoodProduct } from '@/types/Food';
 
 interface ApiProxyConfig {
   baseUrl: string;
   projectId: string;
+  apiKey?: string; // Optional API key for authentication
 }
 
 interface ApiRequest {
@@ -15,127 +19,24 @@ interface ApiRequest {
   body?: any;
 }
 
-// Gemini API Types
-interface GeminiContent {
-  parts: Array<{
-    text?: string;
-    inlineData?: {
-      mimeType: string;
-      data: string;
-    };
-  }>;
-  role?: 'user' | 'model';
+// OpenFoodFacts API Types
+interface OpenFoodFactsSearchResult {
+  products: any[];
 }
 
-interface GeminiGenerationConfig {
-  temperature?: number;
-  topK?: number;
-  topP?: number;
-  maxOutputTokens?: number;
-  stopSequences?: string[];
-  candidateCount?: number;
+interface OpenFoodFactsProduct {
+  code: string;
+  product_name: Record<string, string>;
+  brands: string;
+  categories: string;
+  nutriments: Record<string, any>;
+  allergens: string;
+  additives: string;
+  image_url: string;
+  url: string;
 }
 
-interface GeminiSafetySettings {
-  category: string;
-  threshold: string;
-}
-
-interface GeminiResponse {
-  candidates: Array<{
-    content: GeminiContent;
-    finishReason: string;
-    index: number;
-    safetyRatings: Array<{
-      category: string;
-      probability: string;
-    }>;
-  }>;
-  promptFeedback?: {
-    safetyRatings: Array<{
-      category: string;
-      probability: string;
-    }>;
-  };
-}
-
-// FatSecret API Types
-interface FatSecretSearchResult {
-  foods: {
-    food: FatSecretFood[];
-    max_results: string;
-    page_number: string;
-    total_results: string;
-  };
-}
-
-interface FatSecretFood {
-  food_id: string;
-  food_name: string;
-  food_type: string;
-  food_url: string;
-  brand_name?: string;
-}
-
-interface FatSecretNutrient {
-  calories: string;
-  carbohydrate: string;
-  protein: string;
-  fat: string;
-  saturated_fat?: string;
-  polyunsaturated_fat?: string;
-  monounsaturated_fat?: string;
-  trans_fat?: string;
-  cholesterol?: string;
-  sodium?: string;
-  potassium?: string;
-  fiber?: string;
-  sugar?: string;
-  vitamin_a?: string;
-  vitamin_c?: string;
-  calcium?: string;
-  iron?: string;
-}
-
-interface FatSecretServing {
-  serving_id: string;
-  serving_description: string;
-  serving_url: string;
-  metric_serving_amount?: string;
-  metric_serving_unit?: string;
-  number_of_units?: string;
-  measurement_description: string;
-  calories: string;
-  carbohydrate: string;
-  protein: string;
-  fat: string;
-  saturated_fat?: string;
-  polyunsaturated_fat?: string;
-  monounsaturated_fat?: string;
-  trans_fat?: string;
-  cholesterol?: string;
-  sodium?: string;
-  potassium?: string;
-  fiber?: string;
-  sugar?: string;
-  vitamin_a?: string;
-  vitamin_c?: string;
-  calcium?: string;
-  iron?: string;
-}
-
-interface FatSecretFoodDetail {
-  food: {
-    food_id: string;
-    food_name: string;
-    food_type: string;
-    food_url: string;
-    brand_name?: string;
-    servings: {
-      serving: FatSecretServing | FatSecretServing[];
-    };
-  };
-}
+// OpenFoodFacts is the sole API implementation in this service
 
 type ApiProxyError = {
   status: number;
@@ -151,9 +52,16 @@ class ApiProxyManagerService {
     this.config = config;
   }
 
-  private buildProxyUrl(targetUrl: string): string {
+private buildProxyUrl(targetUrl: string): string {
     const encodedUrl = encodeURIComponent(targetUrl);
     return `${this.config.baseUrl}/proxy/${this.config.projectId}?target_url=${encodedUrl}`;
+  }
+
+  /**
+   * Get API key from configuration
+   */
+  private getApiKeyHeader(): Record<string, string> {
+    return this.config.apiKey ? { 'x-api-key': this.config.apiKey } : {};
   }
 
   private async makeRequest<T = any>(request: ApiRequest): Promise<T> {
@@ -162,9 +70,10 @@ class ApiProxyManagerService {
     try {
       const response = await fetch(proxyUrl, {
         method: request.method || 'GET',
-        headers: {
+headers: {
           'Content-Type': 'application/json',
           'expo-platform': 'ios', // Required by API Proxy Manager
+          ...this.getApiKeyHeader(), // Add API key if configured
           ...request.headers,
         },
         body: request.body ? JSON.stringify(request.body) : undefined,
@@ -197,265 +106,50 @@ class ApiProxyManagerService {
     }
   }
 
-  // === GEMINI API METHODS ===
+  // === OPENFOODFACTS API METHODS ===
   
   /**
-   * Generate content using Gemini Pro model
+   * Search for foods in the OpenFoodFacts database
    */
-  async generateWithGemini(
-    contents: GeminiContent | GeminiContent[],
-    generationConfig?: GeminiGenerationConfig,
-    safetySettings?: GeminiSafetySettings[]
-  ): Promise<GeminiResponse> {
-    const body: any = {
-      contents: Array.isArray(contents) ? contents : [contents]
-    };
-    
-    if (generationConfig) {
-      body.generationConfig = generationConfig;
-    }
-    
-    if (safetySettings) {
-      body.safetySettings = safetySettings;
-    }
-
-    return this.makeRequest<GeminiResponse>({
-      targetUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent',
-      method: 'POST',
-      body
-    });
-  }
-
-  /**
-   * Generate content using Gemini Flash model (faster, lighter)
-   */
-  async generateWithGeminiFlash(
-    contents: GeminiContent | GeminiContent[],
-    generationConfig?: GeminiGenerationConfig,
-    safetySettings?: GeminiSafetySettings[]
-  ): Promise<GeminiResponse> {
-    const body: any = {
-      contents: Array.isArray(contents) ? contents : [contents]
-    };
-    
-    if (generationConfig) {
-      body.generationConfig = generationConfig;
-    }
-    
-    if (safetySettings) {
-      body.safetySettings = safetySettings;
-    }
-
-    return this.makeRequest<GeminiResponse>({
-      targetUrl: 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent',
-      method: 'POST',
-      body
-    });
-  }
-
-  /**
-   * Count tokens for given content
-   */
-  async countTokens(
-    contents: GeminiContent | GeminiContent[],
-    model: 'gemini-1.5-pro' | 'gemini-1.5-flash' = 'gemini-1.5-pro'
-  ): Promise<{ totalTokens: number }> {
-    return this.makeRequest<{ totalTokens: number }>({
-      targetUrl: `https://generativelanguage.googleapis.com/v1beta/models/${model}:countTokens`,
-      method: 'POST',
-      body: {
-        contents: Array.isArray(contents) ? contents : [contents]
-      }
-    });
-  }
-
-  /**
-   * Generate embeddings using Gemini
-   */
-  async generateEmbeddings(
-    content: string,
-    taskType: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING' = 'RETRIEVAL_DOCUMENT'
-  ): Promise<{ embedding: { values: number[] } }> {
-    return this.makeRequest<{ embedding: { values: number[] } }>({
-      targetUrl: 'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent',
-      method: 'POST',
-      body: {
-        content: {
-          parts: [{ text: content }]
-        },
-        taskType
-      }
-    });
-  }
-
-  /**
-   * Batch generate embeddings
-   */
-  async batchGenerateEmbeddings(
-    requests: Array<{
-      content: string;
-      taskType?: 'RETRIEVAL_QUERY' | 'RETRIEVAL_DOCUMENT' | 'SEMANTIC_SIMILARITY' | 'CLASSIFICATION' | 'CLUSTERING';
-    }>
-  ): Promise<{ embeddings: Array<{ values: number[] }> }> {
-    return this.makeRequest<{ embeddings: Array<{ values: number[] }> }>({
-      targetUrl: 'https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:batchEmbedContents',
-      method: 'POST',
-      body: {
-        requests: requests.map(req => ({
-          content: {
-            parts: [{ text: req.content }]
-          },
-          taskType: req.taskType || 'RETRIEVAL_DOCUMENT'
-        }))
-      }
-    });
-  }
-
-  // === FATSECRET API METHODS ===
-  
-  /**
-   * Search for foods in the FatSecret database
-   */
-  async searchFoods(
-    query: string,
-    options: {
-      pageNumber?: number;
-      maxResults?: number;
-    } = {}
-  ): Promise<FatSecretSearchResult> {
-    const params = new URLSearchParams({
-      method: 'foods.search',
-      format: 'json',
-      search_expression: query,
-      page_number: (options.pageNumber || 0).toString(),
-      max_results: (options.maxResults || 50).toString(),
-    });
-
-    return this.makeRequest<FatSecretSearchResult>({
-      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
-      method: 'GET'
-    });
+  async searchFoods(query: string): Promise<FoodProduct[]> {
+    const products = await openfoodfactsService.searchProducts(query);
+    return products;
   }
 
   /**
    * Get detailed food information by Food ID
    */
-  async getFoodDetails(foodId: string): Promise<FatSecretFoodDetail> {
-    const params = new URLSearchParams({
-      method: 'food.get.v4',
-      format: 'json',
-      food_id: foodId,
-    });
-
-    return this.makeRequest<FatSecretFoodDetail>({
-      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
-      method: 'GET'
-    });
-  }
-
-  /**
-   * Search foods by barcode
-   */
-  async searchFoodsByBarcode(barcode: string): Promise<FatSecretFoodDetail> {
-    const params = new URLSearchParams({
-      method: 'food.find_id_for_barcode',
-      format: 'json',
-      barcode: barcode,
-    });
-
-    return this.makeRequest<FatSecretFoodDetail>({
-      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
-      method: 'GET'
-    });
+  async getFoodDetails(foodId: string): Promise<FoodProduct> {
+    const product = await openfoodfactsService.getProductById(foodId);
+    return product || this.getDefaultFoodProduct();
   }
 
   /**
    * Get autocomplete suggestions for food search
    */
-  async getFoodAutoComplete(expression: string): Promise<{
-    suggestions: {
-      suggestion: string[];
-    };
-  }> {
-    const params = new URLSearchParams({
-      method: 'foods.autocomplete',
-      format: 'json',
-      expression: expression,
-    });
-
-    return this.makeRequest({
-      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
-      method: 'GET'
-    });
+  async getFoodAutoComplete(expression: string): Promise<string[]> {
+    const suggestions = await openfoodfactsService.getAutocompleteSuggestions(expression);
+    return suggestions.suggestions;
   }
 
   /**
-   * Get food categories/food groups from FatSecret
+   * Get food categories/food groups from OpenFoodFacts
    */
-  async getFoodCategories(): Promise<{
-    food_categories: {
-      food_category: Array<{
-        food_category_id: string;
-        food_category_name: string;
-        food_category_description: string;
-      }>;
-    };
-  }> {
-    const params = new URLSearchParams({
-      method: 'food_categories.get',
-      format: 'json',
-    });
-
-    return this.makeRequest({
-      targetUrl: `https://platform.fatsecret.com/rest/server.api?${params.toString()}`,
-      method: 'GET'
-    });
+  async getFoodCategories(): Promise<string[]> {
+    const categories = await openfoodfactsService.getCategories();
+    return categories.categories;
   }
 
   /**
-   * Alias for getFoodDetails to maintain backwards compatibility
+   * Search foods by barcode using only OpenFoodFacts
    */
-  async getFoodNutrition(foodId: string): Promise<FatSecretFoodDetail> {
-    return this.getFoodDetails(foodId);
-  }
-
-  // === UTILITY METHODS ===
-  
-  /**
-   * Generic API proxy method for custom requests
-   */
-  async proxyRequest<T = any>(
-    targetUrl: string, 
-    options?: RequestInit
-  ): Promise<T> {
-    return this.makeRequest<T>({
-      targetUrl,
-      method: options?.method || 'GET',
-      headers: options?.headers as Record<string, string>,
-      body: options?.body
-    });
-  }
-
-  /**
-   * Health check for the API Proxy Manager
-   */
-  async healthCheck(): Promise<{ status: string; timestamp: string }> {
-    try {
-      const response = await fetch(`${this.config.baseUrl}/health`);
-      if (response.ok) {
-        return {
-          status: 'healthy',
-          timestamp: new Date().toISOString()
-        };
-      }
-      throw new Error(`Health check failed: ${response.status}`);
-    } catch (error) {
-      console.error('API Proxy Manager health check failed:', error);
-      return {
-        status: 'unhealthy',
-        timestamp: new Date().toISOString()
-      };
+  async searchFoodsByBarcode(barcode: string): Promise<FoodProduct | null> {
+    const openfoodfactsResult = await openfoodfactsService.getProductByBarcode(barcode);
+    if (!openfoodfactsResult) {
+      console.warn(`Product not found: ${barcode}`);
+      return null;
     }
+    return openfoodfactsResult;
   }
 
   /**
@@ -471,12 +165,51 @@ class ApiProxyManagerService {
   updateConfig(newConfig: Partial<ApiProxyConfig>): void {
     this.config = { ...this.config, ...newConfig };
   }
+  
+  /**
+   * Returns a default FoodProduct object with empty values
+   */
+  private getDefaultFoodProduct(): FoodProduct {
+    return {
+      id: '',
+      product_name: '',
+      barcode: '',
+      nutriments: {
+        calories: 0,
+        carbohydrates: 0,
+        proteins: 0,
+        fats: 0,
+        fiber: 0,
+        sugars: 0,
+        sodium: 0,
+        potassium: 0,
+        cholesterol: 0,
+        saturated_fat: 0,
+        trans_fat: 0,
+        monounsaturated_fat: 0,
+        polyunsaturated_fat: 0,
+        vitamin_a: 0,
+        vitamin_c: 0,
+        calcium: 0,
+        iron: 0
+      },
+      brands: ['Unknown'],
+      categories: ['Uncategorized'],
+      allergens: [],
+      additives: [],
+      image_url: '',
+      url: '',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+  }
 }
 
 // Configuration
 const API_PROXY_CONFIG: ApiProxyConfig = {
   baseUrl: 'https://api-proxy-manager.swdev-pa.workers.dev',
   projectId: 'foodtracker-mdf47uug',
+  apiKey: process.env.OPENFOODFACTS_API_KEY, // API key from environment variables
 };
 
 export const apiProxyManager = new ApiProxyManagerService(API_PROXY_CONFIG);

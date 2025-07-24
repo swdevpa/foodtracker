@@ -1,91 +1,54 @@
+/**
+ * Food Types
+ */
+
+export type FoodCategory = 'fruits' | 'vegetables' | 'meat' | 'dairy' | 'grains' | 'proteins' | 'snacks' | 'beverages' | 'spices' | 'other';
+
+export type FoodUnit = 'g' | 'kg' | 'ml' | 'l' | 'pieces';
+
+export type FoodLocation = 'fridge' | 'freezer' | 'pantry' | 'counter';
+
 export interface FoodItem {
   id: string;
   name: string;
-  brand?: string;
   category: FoodCategory;
   quantity: number;
   unit: FoodUnit;
-  expirationDate?: Date;
   location: FoodLocation;
-  foodId?: string; // FatSecret Food ID
-  nutritionPer100g?: NutritionInfo;
   addedAt: Date;
   updatedAt: Date;
+  expirationDate?: Date;
 }
 
-export type FoodCategory = 
-  | 'fruits'
-  | 'vegetables' 
-  | 'meat'
-  | 'dairy'
-  | 'grains'
-  | 'proteins'
-  | 'snacks'
-  | 'beverages'
-  | 'spices'
-  | 'other';
-
-export type FoodUnit = 
-  | 'g'
-  | 'kg' 
-  | 'ml'
-  | 'l'
-  | 'pieces'
-  | 'cups'
-  | 'tbsp'
-  | 'tsp';
-
-export type FoodLocation = 
-  | 'fridge'
-  | 'freezer'
-  | 'pantry'
-  | 'counter';
-
-export interface NutritionInfo {
-  calories: number; // per 100g
-  protein: number; // g
-  carbs: number; // g
-  fat: number; // g
-  fiber?: number; // g
-  sugar?: number; // g
-  sodium?: number; // mg
-  calcium?: number; // mg
-  iron?: number; // mg
-}
-
-export interface Recipe {
+export interface FoodProduct {
   id: string;
-  name: string;
-  description: string;
-  ingredients: RecipeIngredient[];
-  instructions: string[];
-  prepTime: number; // minutes
-  cookTime: number; // minutes
-  servings: number;
-  mealType: MealType;
-  totalNutrition: NutritionInfo;
-  createdAt: Date;
-}
-
-export interface RecipeIngredient {
-  foodItem: FoodItem;
-  amount: number;
-  unit: FoodUnit;
-  nutritionContribution: NutritionInfo;
-}
-
-export type MealType = 'breakfast' | 'lunch' | 'dinner' | 'snack';
-
-export interface MealPlan {
-  id: string;
-  userId: string;
-  date: Date;
-  meals: {
-    breakfast?: Recipe;
-    lunch?: Recipe;
-    dinner?: Recipe;
-    snacks: Recipe[];
+  product_name: string;
+  barcode: string;
+  brands: string[];
+  categories: string[];
+  nutriments: {
+    calories: number;
+    carbohydrates: number;
+    proteins: number;
+    fats: number;
+    fiber: number;
+    sugars: number;
+    sodium: number;
+    potassium: number;
+    cholesterol: number;
+    saturated_fat: number;
+    trans_fat: number;
+    monounsaturated_fat: number;
+    polyunsaturated_fat: number;
+    vitamin_a: number;
+    vitamin_c: number;
+    calcium: number;
+    iron: number;
   };
-  totalNutrition: NutritionInfo;
-  createdAt: Date;
+  allergens: string[];
+  additives: string[];
+  image_url: string;
+  url: string;
+  created_at: string;
+  updated_at: string;
 }
