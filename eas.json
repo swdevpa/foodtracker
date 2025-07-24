@@ -1,0 +1,34 @@
+{
+  "cli": {
+    "version": ">= 13.2.1",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "env": {
+        "API_PROXY_URL": "https://foodtracker-api-proxy.swdev-pa.workers.dev"
+      },
+      "ios": {
+        "resourceClass": "m-medium"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "API_PROXY_URL": "https://foodtracker-api-proxy.swdev-pa.workers.dev"
+      },
+      "ios": {
+        "resourceClass": "m-medium",
+        "simulator": true
+      }
+    },
+    "production": {
+      "distribution": "store",
+      "env": {
+        "API_PROXY_URL": "https://foodtracker-api-proxy.swdev-pa.workers.dev"
+      }    
+    }
+  }
+}

@@ -52,7 +52,7 @@ export default {
         }
       ],
       [
-        "expo-barcode-scanner",
+        "expo-camera",
         {
           cameraPermission: "Allow $(PRODUCT_NAME) to access camera to scan barcodes for food items."
         }

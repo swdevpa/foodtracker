@@ -13,7 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { BarCodeScanner } from 'expo-barcode-scanner';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { FoodItem, FoodCategory, FoodUnit, FoodLocation } from '../types/Food';
 import { openfoodfactsService } from '../services/api/openfoodfactsService';
 
@@ -27,7 +27,7 @@ export default function InventoryScreen() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [selectedFood, setSelectedFood] = useState<any>(null);
   const [barcodeScannerVisible, setBarcodeScannerVisible] = useState(false);
-  const [hasPermission, setHasPermission] = useState<boolean | null>(null);
+  const [permission, requestPermission] = useCameraPermissions();
   const [newItem, setNewItem] = useState<Partial<FoodItem>>({
     name: '',
     category: 'other',
@@ -40,13 +40,7 @@ export default function InventoryScreen() {
 
   useEffect(() => {
     loadInventory();
-    getBarCodeScannerPermissions();
   }, []);
-
-  const getBarCodeScannerPermissions = async () => {
-    const { status } = await BarCodeScanner.requestPermissionsAsync();
-    setHasPermission(status === 'granted');
-  };
 
   useEffect(() => {
     filterInventory();
@@ -126,9 +120,9 @@ export default function InventoryScreen() {
     }
   };
 
-  const handleBarCodeScanned = ({ type, data }: { type: string; data: string }) => {
+  const handleBarCodeScanned = (scanningResult: { data: string }) => {
     setBarcodeScannerVisible(false);
-    searchByBarcode(data);
+    searchByBarcode(scanningResult.data);
   };
 
   const selectFood = (item: any) => {
@@ -546,25 +540,28 @@ export default function InventoryScreen() {
           <View style={{ width: 80 }} />
         </View>
         
-        {hasPermission === null ? (
+        {!permission ? (
           <View style={styles.permissionContainer}>
             <Text>Kamera-Berechtigung wird angefordert...</Text>
           </View>
-        ) : hasPermission === false ? (
+        ) : !permission.granted ? (
           <View style={styles.permissionContainer}>
             <Text>Keine Kamera-Berechtigung</Text>
             <TouchableOpacity
               style={styles.permissionButton}
-              onPress={getBarCodeScannerPermissions}
+              onPress={requestPermission}
             >
               <Text style={styles.permissionButtonText}>Berechtigung anfordern</Text>
             </TouchableOpacity>
           </View>
         ) : (
           <>
-            <BarCodeScanner
-              onBarCodeScanned={handleBarCodeScanned}
+            <CameraView
               style={styles.scanner}
+              barcodeScannerSettings={{
+                barcodeTypes: ["qr", "ean13", "ean8", "upc_a", "upc_e", "code128", "code39"],
+              }}
+              onBarcodeScanned={handleBarCodeScanned}
             />
             <View style={styles.scannerOverlay}>
               <View style={styles.scannerFrame} />
@@ -592,9 +589,9 @@ export default function InventoryScreen() {
           <TouchableOpacity
             style={styles.barcodeButton}
             onPress={() => {
-              if (hasPermission === null) {
-                getBarCodeScannerPermissions();
-              } else if (hasPermission === false) {
+              if (!permission) {
+                requestPermission();
+              } else if (!permission.granted) {
                 Alert.alert('Keine Berechtigung', 'Kamera-Berechtigung ist erforderlich für das Scannen von Barcodes.');
               } else {
                 setBarcodeScannerVisible(true);
